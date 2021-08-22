@@ -1,17 +1,138 @@
 use std::{fs::File, io::{self, BufRead}};
-
 use crate::error::*;
 
-
-// Slightly annoying that it need be done this way at the moment, but it seems easier than figuring out how to const it?
+// It seems there isn't a simple way to make simple static vec
 // This likely needs to be static due to how builtins will work in future, but I think it's an acceptable singleton for this context.
-pub static mut MAP: Option<Map> = None;
+pub static mut WORLD: World = World {
+    map: None, 
+    rsalen: Rsalen {
+        row: 0,
+        col: 0,
+        dir: Direction::East,
+    }
+};
+
+
+// Atomic Statements
+pub fn move_forward() -> Result<(), CrashError> {
+    unsafe {
+        let direction = WORLD.rsalen.dir;
+        let (row, col) = (
+            WORLD.rsalen.row,
+            WORLD.rsalen.col,
+        );
+        match direction {
+            Direction::North => WORLD.place_rsalen(row - 1, col),
+            Direction::West => WORLD.place_rsalen(row, col - 1),
+            Direction::South => WORLD.place_rsalen(row + 1, col),
+            Direction::East => WORLD.place_rsalen(row, col + 1),
+        }
+    }
+}
+
+pub fn turn_left() {
+    unsafe {
+        WORLD.turn_rsalen_left()
+    }
+}
+
+pub fn drop_crumb() {
+    unsafe {
+        WORLD.map.as_mut().unwrap().drop_crumb(
+            WORLD.rsalen.row,
+            WORLD.rsalen.col,
+        )
+    }
+}
+
+pub fn pickup_crumb() -> Result<(), CrumbPickupError> {
+    unsafe {
+        WORLD.map.as_mut().unwrap().pickup_crumb(
+            WORLD.rsalen.row,
+            WORLD.rsalen.col,
+        )
+    }
+}
+
+
+pub struct World {
+    pub map: Option<Map>,
+    rsalen: Rsalen,
+}
+
+impl World {
+    pub fn give_map(&mut self, map: Map) {
+        self.map = Some(map);
+    }
+
+    pub fn place_rsalen(&mut self, row: usize, col: usize) -> Result<(), CrashError> {
+        let destination = self.map.as_ref().unwrap().at(row, col);
+        match destination {
+            Ok(Tile::Wall) | Err(_) => Err(CrashError{ row, col }),
+            _ => {
+                self.rsalen.row = row;
+                self.rsalen.col = col;
+                Ok(())
+            }
+        }
+    }
+    
+    pub fn direct_rsalen(&mut self, dir: Direction) {
+        self.rsalen.dir = dir;
+    }
+
+    fn turn_rsalen_left(&mut self) {
+        self.rsalen.dir = match &self.rsalen.dir {
+            Direction::North => Direction::West,
+            Direction::West => Direction::South,
+            Direction::South => Direction::East,
+            Direction::East => Direction::North,
+        };
+    }
+
+    pub fn display(&self) {
+        println!("\n\n\n\n\n");
+        let (r_row, r_col) = (self.rsalen.row, self.rsalen.col);
+        for (row, row_vec) in self.map.as_ref().unwrap().contents.iter().enumerate() {
+            for (col, element) in row_vec.iter().enumerate() {
+                print!("{} ", if row == r_row && col == r_col {
+                    match self.rsalen.dir {
+                        Direction::North => "∧",
+                        Direction::West => "<",
+                        Direction::South => "v",
+                        Direction::East => ">",
+                    }
+                } else {
+                    match element {
+                        Tile::Empty => " ",
+                        Tile::Wall => "X",
+                        Tile::Crumbs(_) => ".",
+                    }
+                });
+            }
+            println!("");
+        }
+    }
+}
+
+pub struct Rsalen {
+    row: usize,
+    col: usize,
+    dir: Direction,
+}
+
+#[derive(Debug,  Clone, Copy)]
+pub enum Direction {
+    North, West, South, East,
+}
 
 pub struct Map {
     pub rows: usize,
     pub cols: usize,
     contents: Vec<Vec<Tile>>,
 }
+
+// Map related code!
 
 impl Map {
     pub fn from_file(filename: &str) -> Self {
@@ -29,16 +150,23 @@ impl Map {
             rows += 1;
             let mut row = Vec::new();
             for (i, char) in line.unwrap().chars().enumerate() {
+                let i = i + 1;
                 cols = cols.max(i);
                 row.push( match char {
                     'x'|'X'=> Tile::Wall,
                     ' ' => Tile::Empty,
                     '.' => Tile::Crumbs(1),
                     '1'..='9' => Tile::Crumbs(char as u32 - '0' as u32),
-                    _ => panic!("Invalid character \"{}\" on line {}, column {}", char, rows, i + 1, )
+                    _ => panic!("Invalid character \"{}\" on line {}, column {}", char, rows, i)
                 })
             }
             contents.push(row);
+        }
+
+        for row in &mut contents {
+            while row.len() < cols {
+                row.push(Tile::Empty);
+            }
         }
 
         Self{

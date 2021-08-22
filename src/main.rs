@@ -1,9 +1,8 @@
 use std::env;
+use world::{Map, WORLD};
 
-use crate::map::{Map, MAP};
-
-pub mod map;
 pub mod error;
+pub mod world;
 
 // Symbols for Rsalen:
 // ∧ v > < 
@@ -27,7 +26,7 @@ fn main() {
     }
     // Mutating statics is unsafe... unfortunate, but livable.
     unsafe { 
-        MAP = Some(
+        WORLD.give_map(
             if let Some(filename) = &map_file {
                 Map::from_file(filename)
             } else {
@@ -38,5 +37,6 @@ fn main() {
 
     // TODO: Implement Rsalen and builtin methods, test them.
     println!("{}, {:?}", code_file.unwrap(), map_file);
+    unsafe { WORLD.display(); }
 }
 
