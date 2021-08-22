@@ -1,11 +1,11 @@
 use std::env;
-use world::{Map, WORLD};
+use world::Map;
+
+use crate::world::Direction;
 
 pub mod error;
 pub mod world;
 
-// Symbols for Rsalen:
-// ∧ v > < 
 
 
 fn main() {
@@ -16,27 +16,47 @@ fn main() {
     // println!("{:?}", here);
     let mut code_file = None;
     let mut map_file = None;
+    let (mut start_row, mut start_col) = (0, 0);
+    let mut start_dir = Direction::East;
+
     while let Some(arg) = args.next() {
-        // -m options is used to set the map file; otherwise it will be a 10x10 empty grid.
-        if arg.trim() == "-m" {
-            map_file = args.next();
-        } else {
-            code_file = Some(arg)
-        }
-    }
-    // Mutating statics is unsafe... unfortunate, but livable.
-    unsafe { 
-        WORLD.give_map(
-            if let Some(filename) = &map_file {
-                Map::from_file(filename)
-            } else {
-                Map::default()
+        // TODO: Proper error reporting here
+        match arg.trim() {
+            "-m" => { map_file = args.next(); },
+            "-r" => { start_row = args.next().unwrap_or("0".into()).trim().parse().unwrap() }
+            "-c" => { start_col = args.next().unwrap_or("0".into()).trim().parse().unwrap() }
+            "-p" => { 
+                start_row = args.next().unwrap_or("0".into()).trim().parse().unwrap(); 
+                start_col = args.next().unwrap_or("0".into()).trim().parse().unwrap(); 
             }
-        );
+            "-d" => {
+                start_dir = match args.next().unwrap_or("e".into()).trim().to_lowercase().as_str() {
+                    "n" | "north" => Direction::North,
+                    "s" | "south" => Direction::South,
+                    "e" | "east" => Direction::East,
+                    "w" | "west" => Direction::West,
+                    x => panic!("Invalid direction: {}", x)
+                };
+            }
+            _ => { code_file = Some(arg) }
+            
+        };
     }
+    
+    world::set_map(
+        if let Some(filename) = &map_file {
+            Map::from_file(filename)
+        } else {
+            Map::default()
+        }
+    );
+
+    world::place_rsalen(start_row, start_col);
+    world::direct_rsalen(start_dir);
+
 
     // TODO: Implement Rsalen and builtin methods, test them.
     println!("{}, {:?}", code_file.unwrap(), map_file);
-    unsafe { WORLD.display(); }
+    world::display(); 
 }
 

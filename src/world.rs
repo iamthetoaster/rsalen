@@ -54,6 +54,32 @@ pub fn pickup_crumb() -> Result<(), CrumbPickupError> {
     }
 }
 
+// methods not relevant to Rsalen language but worth exporting
+pub fn place_rsalen(row: usize, col: usize) -> Result<(), CrashError> {
+    unsafe {
+        WORLD.place_rsalen(row, col)
+    }
+}
+
+pub fn direct_rsalen(dir: Direction) {
+    unsafe {
+        WORLD.direct_rsalen(dir)
+    }
+}
+
+pub fn set_map(map: Map) {
+    unsafe {
+        WORLD.give_map(map)
+    }
+}
+
+pub fn display() {
+    unsafe {
+        WORLD.display();
+    }
+}
+
+
 
 pub struct World {
     pub map: Option<Map>,
@@ -96,6 +122,8 @@ impl World {
         for (row, row_vec) in self.map.as_ref().unwrap().contents.iter().enumerate() {
             for (col, element) in row_vec.iter().enumerate() {
                 print!("{} ", if row == r_row && col == r_col {
+                    // Symbols for Rsalen:
+                    // ∧ v > < 
                     match self.rsalen.dir {
                         Direction::North => "∧",
                         Direction::West => "<",
