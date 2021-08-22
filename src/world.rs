@@ -3,7 +3,7 @@ use crate::error::*;
 
 // It seems there isn't a simple way to make simple static vec
 // This likely needs to be static due to how builtins will work in future, but I think it's an acceptable singleton for this context.
-pub static mut WORLD: World = World {
+static mut WORLD: World = World {
     map: None, 
     rsalen: Rsalen {
         row: 0,
@@ -17,16 +17,17 @@ pub static mut WORLD: World = World {
 pub fn move_forward() -> Result<(), CrashError> {
     unsafe {
         let direction = WORLD.rsalen.dir;
-        let (row, col) = (
+        let (mut row, mut col) = (
             WORLD.rsalen.row,
             WORLD.rsalen.col,
         );
         match direction {
-            Direction::North => WORLD.place_rsalen(row - 1, col),
-            Direction::West => WORLD.place_rsalen(row, col - 1),
-            Direction::South => WORLD.place_rsalen(row + 1, col),
-            Direction::East => WORLD.place_rsalen(row, col + 1),
-        }
+            Direction::North => row -= 1,
+            Direction::West => col -= 1,
+            Direction::South => row += 1,
+            Direction::East => col += 1,
+        };
+        WORLD.place_rsalen(row, col)
     }
 }
 
@@ -51,6 +52,40 @@ pub fn pickup_crumb() -> Result<(), CrumbPickupError> {
             WORLD.rsalen.row,
             WORLD.rsalen.col,
         )
+    }
+}
+
+// Atomic Queries
+pub fn front_blocked() -> bool {
+    unsafe {
+        let direction = WORLD.rsalen.dir;
+        let (mut row, mut col) = (
+            WORLD.rsalen.row,
+            WORLD.rsalen.col,
+        );
+        match direction {
+            Direction::North => row -= 1,
+            Direction::West => col -= 1,
+            Direction::South => row += 1,
+            Direction::East => col += 1,
+        };
+        match WORLD.map.as_ref().unwrap().at(row, col) {
+            Ok(Tile::Empty) | Ok(Tile::Crumbs(_)) => false,
+            _ => true,
+        }
+    }
+}
+
+pub fn on_crumb() -> bool {
+    unsafe {
+        let (row, col) = (
+            WORLD.rsalen.row,
+            WORLD.rsalen.col,
+        );
+        match WORLD.map.as_ref().unwrap().at(row, col) {
+            Ok(Tile::Crumbs(_)) => true,
+            _ => false,
+        }
     }
 }
 
@@ -80,8 +115,8 @@ pub fn display() {
 }
 
 
-
-pub struct World {
+// TODO: Consider moving methods all the way out into public functions.
+struct World {
     pub map: Option<Map>,
     rsalen: Rsalen,
 }
@@ -94,7 +129,8 @@ impl World {
     pub fn place_rsalen(&mut self, row: usize, col: usize) -> Result<(), CrashError> {
         let destination = self.map.as_ref().unwrap().at(row, col);
         match destination {
-            Ok(Tile::Wall) | Err(_) => Err(CrashError{ row, col }),
+            Ok(Tile::Wall) => Err(CrashError{ row, col, cause: CrashCause::Wall }),
+            Err(_) => Err(CrashError{ row, col, cause: CrashCause::OutOfBounds }),
             _ => {
                 self.rsalen.row = row;
                 self.rsalen.col = col;
@@ -143,7 +179,7 @@ impl World {
     }
 }
 
-pub struct Rsalen {
+struct Rsalen {
     row: usize,
     col: usize,
     dir: Direction,

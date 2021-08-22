@@ -51,6 +51,7 @@ fn main() {
         }
     );
 
+    //  TODO: Handle error here
     world::place_rsalen(start_row, start_col);
     world::direct_rsalen(start_dir);
 
