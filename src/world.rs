@@ -153,7 +153,7 @@ impl World {
     }
 
     pub fn display(&self) {
-        println!("\n\n\n\n\n");
+        println!("");
         let (r_row, r_col) = (self.rsalen.row, self.rsalen.col);
         for (row, row_vec) in self.map.as_ref().unwrap().contents.iter().enumerate() {
             for (col, element) in row_vec.iter().enumerate() {
