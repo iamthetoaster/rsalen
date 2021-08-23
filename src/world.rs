@@ -1,10 +1,13 @@
 use std::{fs::File, io::{self, BufRead}};
 use crate::error::*;
 
-// It seems there isn't a simple way to make simple static vec
 // This likely needs to be static due to how builtins will work in future, but I think it's an acceptable singleton for this context.
 static mut WORLD: World = World {
-    map: None, 
+    map: Map {
+        rows: 0,
+        cols: 0,
+        contents: vec![],
+    }, 
     rsalen: Rsalen {
         row: 0,
         col: 0,
@@ -39,7 +42,7 @@ pub fn turn_left() {
 
 pub fn drop_crumb() {
     unsafe {
-        WORLD.map.as_mut().unwrap().drop_crumb(
+        WORLD.map.drop_crumb(
             WORLD.rsalen.row,
             WORLD.rsalen.col,
         )
@@ -48,7 +51,7 @@ pub fn drop_crumb() {
 
 pub fn pickup_crumb() -> Result<(), CrumbPickupError> {
     unsafe {
-        WORLD.map.as_mut().unwrap().pickup_crumb(
+        WORLD.map.pickup_crumb(
             WORLD.rsalen.row,
             WORLD.rsalen.col,
         )
@@ -69,7 +72,7 @@ pub fn front_blocked() -> bool {
             Direction::South => row += 1,
             Direction::East => col += 1,
         };
-        match WORLD.map.as_ref().unwrap().at(row, col) {
+        match WORLD.map.at(row, col) {
             Ok(Tile::Empty) | Ok(Tile::Crumbs(_)) => false,
             _ => true,
         }
@@ -82,7 +85,7 @@ pub fn on_crumb() -> bool {
             WORLD.rsalen.row,
             WORLD.rsalen.col,
         );
-        match WORLD.map.as_ref().unwrap().at(row, col) {
+        match WORLD.map.at(row, col) {
             Ok(Tile::Crumbs(_)) => true,
             _ => false,
         }
@@ -117,17 +120,17 @@ pub fn display() {
 
 // TODO: Consider moving methods all the way out into public functions.
 struct World {
-    pub map: Option<Map>,
+    pub map: Map,
     rsalen: Rsalen,
 }
 
 impl World {
     pub fn give_map(&mut self, map: Map) {
-        self.map = Some(map);
+        self.map = map;
     }
 
     pub fn place_rsalen(&mut self, row: usize, col: usize) -> Result<(), CrashError> {
-        let destination = self.map.as_ref().unwrap().at(row, col);
+        let destination = self.map.at(row, col);
         match destination {
             Ok(Tile::Wall) => Err(CrashError{ row, col, cause: CrashCause::Wall }),
             Err(_) => Err(CrashError{ row, col, cause: CrashCause::OutOfBounds }),
@@ -155,7 +158,7 @@ impl World {
     pub fn display(&self) {
         println!("");
         let (r_row, r_col) = (self.rsalen.row, self.rsalen.col);
-        for (row, row_vec) in self.map.as_ref().unwrap().contents.iter().enumerate() {
+        for (row, row_vec) in self.map.contents.iter().enumerate() {
             for (col, element) in row_vec.iter().enumerate() {
                 print!("{} ", if row == r_row && col == r_col {
                     // Symbols for Rsalen:
